@@ -1,0 +1,21 @@
+# Firebase build artifacts
+build/
+windows/flutter/ephemeral/
+*.pdb
+*.ilk
+*.lib
+*.dll
+*.zip
+
+# Flutter/Dart build caches
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.idea/
+.vscode/
+*.iml
+
+# Generated
+*.log
