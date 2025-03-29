@@ -14,3 +14,4 @@ windows/flutter/ephemeral/
 .vscode/
 *.iml
 *.log
+.git_backup/
