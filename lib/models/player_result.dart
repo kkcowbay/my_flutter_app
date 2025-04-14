@@ -1,25 +1,22 @@
 class PlayerResult {
-  final String playerName;
+  final String name;
   final double time;
-  final bool isLate;
   final int rank;
-  final bool notClicked;
+  final String avatar;
 
   PlayerResult({
-    required this.playerName,
+    required this.name,
     required this.time,
-    required this.isLate,
     required this.rank,
-    required this.notClicked,
+    required this.avatar,
   });
 
-  factory PlayerResult.empty() {
+  factory PlayerResult.fromJson(Map<String, dynamic> json) {
     return PlayerResult(
-      playerName: '未知玩家',
-      time: 10.00000,
-      isLate: true,
-      rank: 999,
-      notClicked: true,
+      name: json['name'],
+      time: (json['time'] as num).toDouble(),
+      rank: json['rank'],
+      avatar: json['avatar'],
     );
   }
 }

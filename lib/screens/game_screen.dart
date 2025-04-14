@@ -1,194 +1,142 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/websocket_service.dart';
-import '../models/player_result.dart';
 
 class GameScreen extends StatefulWidget {
   final WebSocketService wsService;
   final String playerName;
 
   const GameScreen({
-    Key? key,
+    super.key,
     required this.wsService,
     required this.playerName,
-  }) : super(key: key);
+  });
 
   @override
-  _GameScreenState createState() => _GameScreenState();
+  State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  double _countdown = 0;
-  Timer? _countdownTimer;
-  bool _hasClicked = false;
-  bool _startCountdown = false;
-  bool _canRestart = false;
-  List<PlayerResult> _playerResults = [];
-  String _countdownDisplay = '準備中...';
+  double countdown = 5.5;
+  bool gameEnded = false;
+  bool clicked = false;
+  Timer? timer;
+  Timer? afterCountdownTimer;
+  bool showStartCountdown = true;
+  int startCountdown = 3;
 
   @override
   void initState() {
     super.initState();
+    startStartCountdown();
+  }
 
-    widget.wsService.onCountdown = (time) {
-      _startPreciseCountdown(time);
+  void startStartCountdown() {
+    Timer.periodic(const Duration(seconds: 1), (t) {
+      if (startCountdown > 1) {
+        setState(() {
+          startCountdown--;
+        });
+      } else {
+        t.cancel();
+        setState(() {
+          showStartCountdown = false;
+        });
+        startCountdownTimer();
+      }
+    });
+  }
+
+  void startCountdownTimer() {
+    timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       setState(() {
-        _startCountdown = true;
+        countdown -= 0.01;
       });
-    };
-
-    widget.wsService.onGameResult = (data) {
-      _handleGameResult(data);
-    };
-
-    widget.wsService.onRestartGame = () {
-      _restartGame();
-    };
+      if (countdown <= 0) {
+        t.cancel();
+        countdown = 0;
+        startAfterCountdownTimer();
+      }
+    });
   }
 
-  void _startPreciseCountdown(double durationSeconds) {
-    _countdown = durationSeconds;
-    const tick = Duration(milliseconds: 10);
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(tick, (timer) {
+  void startAfterCountdownTimer() {
+    afterCountdownTimer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       setState(() {
-        _countdown -= 0.01;
-        if (_countdown <= 0.00001) {
-          _countdown = 0.00000;
-          timer.cancel();
-        }
-        _countdownDisplay = _countdown > 0
-            ? '倒數: ${_countdown.toStringAsFixed(2)}'
-            : '倒數結束';
+        countdown += 0.01;
       });
+      if (countdown >= 10.0 && !gameEnded) {
+        t.cancel();
+        sendResult();
+      }
     });
   }
 
-  void _handleGameResult(dynamic data) {
-    List<dynamic> resultList = data['results'];
-    List<PlayerResult> results = resultList.map((item) {
-      return PlayerResult(
-        playerName: item['playerName'],
-        time: double.parse(item['time'].toStringAsFixed(5)),
-        isLate: item['isLate'],
-        rank: item['rank'],
-        notClicked: item['notClicked'] ?? false,
-      );
-    }).toList();
-
-    results.sort((a, b) => a.rank.compareTo(b.rank));
-
-    setState(() {
-      _playerResults = results;
-    });
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _showResultDialog();
-    });
-
-    _showPodiumAnimation(results);
-  }
-
-  void _showResultDialog() {
-    final playerName = widget.playerName;
-    final result = _playerResults.firstWhere(
-      (r) => r.playerName == playerName,
-      orElse: () => PlayerResult.empty(),
-    );
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('結果'),
-        content: Text(
-          result.notClicked
-              ? '你未按下按鈕，記錄時間 +10.00000 秒'
-              : '你的時間差是 ${result.time.toStringAsFixed(5)} 秒',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _canRestart = true;
-              });
-            },
-            child: const Text('確定'),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _showPodiumAnimation(List<PlayerResult> results) {
-    final top3 = results.where((r) => r.rank <= 3 && !r.notClicked).toList();
-    for (var r in top3) {
-      debugPrint('🏆 第 ${r.rank} 名：${r.playerName}，秒數：${r.time}');
+  void sendResult() {
+    if (!clicked) {
+      widget.wsService.sendClick(10.0);
     }
+    setState(() {
+      gameEnded = true;
+    });
   }
 
-  void _restartGame() {
-    setState(() {
-      _hasClicked = false;
-      _countdown = 0;
-      _startCountdown = false;
-      _playerResults.clear();
-      _canRestart = false;
-      _countdownDisplay = '準備中...';
-    });
+  void handleClick() {
+    if (!clicked && !showStartCountdown) {
+      widget.wsService.sendClick(countdown);
+      setState(() {
+        clicked = true;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
+    timer?.cancel();
+    afterCountdownTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('遊戲開始'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      backgroundColor: countdown > 5.5 ? Colors.black : Colors.white,
       body: Center(
-        child: _startCountdown
-            ? Column(
+        child: showStartCountdown
+            ? Text(
+                '$startCountdown',
+                style: const TextStyle(
+                  fontSize: 96,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _countdownDisplay,
-                    style: const TextStyle(fontSize: 32),
+                    countdown.toStringAsFixed(2),
+                    style: TextStyle(
+                      fontSize: 64,
+                      fontWeight: FontWeight.bold,
+                      color: countdown <= 0 ? Colors.red : Colors.black,
+                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 48),
                   ElevatedButton(
-                    onPressed: _hasClicked || _countdown <= 0
-                        ? null
-                        : () {
-                            final delta = _countdown - 0;
-                            widget.wsService.sendClick(delta);
-                            setState(() {
-                              _hasClicked = true;
-                            });
-                          },
-                    child: const Text('按下按鈕'),
+                    onPressed: handleClick,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 48,
+                        vertical: 24,
+                      ),
+                      backgroundColor: clicked ? Colors.grey : Colors.blue,
+                    ),
+                    child: Text(
+                      clicked ? "已點擊" : "點我！",
+                      style: const TextStyle(fontSize: 24),
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  if (_canRestart)
-                    ElevatedButton(
-                      onPressed: _restartGame,
-                      child: const Text('重新開始'),
-                    )
                 ],
-              )
-            : Center(
-                child: Text(
-                  _countdownDisplay,
-                  style: const TextStyle(fontSize: 72),
-                ),
               ),
       ),
     );

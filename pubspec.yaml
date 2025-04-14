@@ -1,6 +1,6 @@
 name: my_flutter_app
 description: A real-time multiplayer reaction game.
-publish_to: 'none' # 若要發布到 pub.dev，請移除此行
+publish_to: 'none'
 
 version: 1.0.0+1
 
@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   provider: ^6.1.1
   web_socket_channel: ^3.0.2
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -21,3 +23,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Cubic
+      fonts:
+        - asset: assets/fonts/Cubic_11_1.100_R.ttf
+  assets:
+    - assets/avatars/avatar1.png
+    - assets/avatars/avatar2.png
+    - assets/avatars/avatar3.png

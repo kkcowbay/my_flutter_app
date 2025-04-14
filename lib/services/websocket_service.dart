@@ -12,6 +12,9 @@ class WebSocketService {
 
   String? playerName;
   String? roomId;
+  String? selectedAvatar;
+  List<Player> players = [];
+  String? roomHost;
 
   VoidCallback? onRoomUpdate;
   VoidCallback? onError;
@@ -21,8 +24,9 @@ class WebSocketService {
   CountdownCallback? onCountdown;
   GameResultCallback? onGameResult;
   RestartCallback? onRestartGame;
+  Function(String playerName, String message)? onQuickMessage;
 
-  void connect(String url) {
+  void connect({required String url}) {
     if (_isConnected) return;
     _channel = WebSocketChannel.connect(Uri.parse(url));
     _isConnected = true;
@@ -33,6 +37,10 @@ class WebSocketService {
 
       switch (type) {
         case 'room_update':
+          players = (data['players'] as List)
+              .map((p) => Player.fromJson(p))
+              .toList();
+          roomHost = data['host'];
           onRoomUpdate?.call();
           break;
         case 'error':
@@ -57,6 +65,9 @@ class WebSocketService {
         case 'restart_game':
           onRestartGame?.call();
           break;
+        case 'quick_message':
+          onQuickMessage?.call(data['playerName'], data['message']);
+          break;
         default:
           break;
       }
@@ -64,42 +75,51 @@ class WebSocketService {
     print("✅ WebSocket 已連線: $url");
   }
 
-  void joinRoom(String roomId, String playerName) {
+  void joinRoom(String roomId, String playerName, String avatar) {
     this.roomId = roomId;
     this.playerName = playerName;
+    selectedAvatar = avatar;
 
     final msg = json.encode({
       'type': 'join',
       'roomId': roomId,
       'playerName': playerName,
+      'avatar': avatar,
     });
 
     _channel.sink.add(msg);
-    print("👤 傳送加入房間請求: $playerName 加入 $roomId");
   }
 
-  void toggleReady(bool isReady) {
+  void toggleReady(bool ready) {
     final msg = json.encode({
       'type': 'toggle_ready',
-      'playerName': playerName,
       'roomId': roomId,
-      'ready': isReady,
+      'playerName': playerName,
+      'ready': ready,
     });
 
     _channel.sink.add(msg);
-    print("🔄 傳送準備狀態: $playerName => $isReady");
+  }
+
+  void startGame() {
+    final msg = json.encode({
+      'type': 'start_game',
+      'roomId': roomId,
+      'playerName': playerName,
+    });
+
+    _channel.sink.add(msg);
   }
 
   void sendClick(double delta) {
     final msg = json.encode({
       'type': 'click',
-      'playerName': playerName,
       'roomId': roomId,
+      'playerName': playerName,
       'delta': delta,
     });
 
     _channel.sink.add(msg);
-    print("🖱️ 傳送按鈕點擊秒數: $delta");
   }
 
   void requestRestart() {
@@ -109,11 +129,37 @@ class WebSocketService {
     });
 
     _channel.sink.add(msg);
-    print("🔁 傳送重新開始請求");
+  }
+
+  void sendQuickMessage(String message) {
+    final msg = json.encode({
+      'type': 'send_quick_message',
+      'roomId': roomId,
+      'playerName': playerName,
+      'message': message,
+    });
+
+    _channel.sink.add(msg);
   }
 
   void dispose() {
     _channel.sink.close();
     _isConnected = false;
+  }
+}
+
+class Player {
+  final String name;
+  final bool ready;
+  final String avatar;
+
+  Player({required this.name, required this.ready, required this.avatar});
+
+  factory Player.fromJson(Map<String, dynamic> json) {
+    return Player(
+      name: json['name'],
+      ready: json['ready'],
+      avatar: json['avatar'],
+    );
   }
 }

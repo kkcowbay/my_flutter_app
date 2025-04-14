@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'screens/join_room_screen.dart';
+import 'screens/home_screen.dart';
 import 'services/websocket_service.dart';
 
 void main() {
@@ -17,23 +18,53 @@ void main() {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final wsService = Provider.of<WebSocketService>(context, listen: false);
+
     return MaterialApp(
       title: 'Speed King',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
+      themeMode: _themeMode,
+      theme: ThemeData.light(useMaterial3: true).copyWith(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
+        textTheme: ThemeData.light().textTheme.apply(fontFamily: 'Cubic'),
       ),
-      home: Builder(
-        builder: (context) {
-          final wsService = Provider.of<WebSocketService>(context, listen: false);
-          return JoinRoomScreen(wsService: wsService);
-        },
+      darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+        textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Cubic'),
+      ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''),
+        Locale('zh', ''),
+      ],
+      home: HomeScreen(
+        wsService: wsService,
+        onToggleTheme: _toggleTheme,
       ),
     );
   }

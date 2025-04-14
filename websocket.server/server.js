@@ -1,44 +1,103 @@
 const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 8080 });
+
+const server = new WebSocket.Server({ port: 8080 });
 
 let rooms = {};
 
-wss.on('connection', function connection(ws) {
-  ws.on('message', function incoming(message) {
+server.on('connection', (ws) => {
+  console.log('新玩家連線');
+
+  ws.on('message', (message) => {
     const data = JSON.parse(message);
     const { type, roomId, playerName } = data;
 
     switch (type) {
-      case 'join_room':
-        if (!rooms[roomId]) rooms[roomId] = [];
-        rooms[roomId].push({ ws, playerName, ready: false });
-        broadcastRoom(roomId);
+      case 'join':
+        if (!rooms[roomId]) {
+          rooms[roomId] = { players: [], host: playerName };
+        }
+        rooms[roomId].players.push({
+          name: playerName,
+          ready: false,
+          avatar: data.avatar ?? 'avatar1.png', // 新增：預設頭像
+        });
+        broadcastRoomUpdate(roomId);
         break;
 
       case 'toggle_ready':
-        const players = rooms[roomId];
-        const player = players.find(p => p.playerName === playerName);
-        if (player) player.ready = data.ready;
-        broadcastRoom(roomId);
-
-        // 如果所有人都 ready，自動開始遊戲
-        if (players.every(p => p.ready)) {
-          players.forEach(p => p.ws.send(JSON.stringify({ type: 'game_start' })));
+        const player = rooms[roomId]?.players.find(p => p.name === playerName);
+        if (player) {
+          player.ready = data.ready;
+          broadcastRoomUpdate(roomId);
         }
         break;
 
+      case 'start_game':
+        broadcast(roomId, {
+          type: 'game_start',
+        });
+        break;
+
       case 'click':
-        // 實作記錄玩家秒數與排名邏輯（你已有完整版本）
+        broadcast(roomId, {
+          type: 'click_result',
+          playerName: playerName,
+          delta: data.delta,
+        });
+        break;
+
+      case 'restart_game':
+        broadcast(roomId, {
+          type: 'restart_game',
+        });
+        break;
+
+      case 'send_quick_message':
+        broadcast(roomId, {
+          type: 'quick_message',
+          playerName: playerName,
+          message: data.message,
+        });
+        break;
+
+      default:
         break;
     }
   });
+
+  ws.on('close', () => {
+    console.log('玩家斷線');
+    removePlayerFromRooms(ws);
+  });
 });
 
-function broadcastRoom(roomId) {
-  const players = rooms[roomId] || [];
-  const playerList = players.map(p => ({ playerName: p.playerName, ready: p.ready }));
-  const msg = JSON.stringify({ type: 'room_update', players: playerList });
-  players.forEach(p => p.ws.send(msg));
+function broadcastRoomUpdate(roomId) {
+  const room = rooms[roomId];
+  if (room) {
+    const data = {
+      type: 'room_update',
+      players: room.players,
+      host: room.host,
+    };
+    broadcast(roomId, data);
+  }
 }
 
-console.log("✅ WebSocket server running on ws://localhost:8080");
+function broadcast(roomId, data) {
+  server.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
+}
+
+function removePlayerFromRooms(ws) {
+  for (const roomId in rooms) {
+    rooms[roomId].players = rooms[roomId].players.filter(p => p.ws !== ws);
+    if (rooms[roomId].players.length === 0) {
+      delete rooms[roomId];
+    }
+  }
+}
+
+console.log('✅ WebSocket 伺服器已啟動在 ws://localhost:8080');
